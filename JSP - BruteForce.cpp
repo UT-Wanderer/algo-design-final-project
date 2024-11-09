@@ -99,6 +99,11 @@ public:
             cout << ")\n";
         }
     }
+
+    const vector<Machine> &getMachines() const
+    {
+        return machines;
+    }
 };
 
 template <typename Func>
@@ -116,7 +121,29 @@ void runTestCase(const string &testName, const vector<Job> &jobs, int numMachine
     JobSchedule scheduler(numMachines, jobs);
     long long runtime = measureTime([&]()
                                     { scheduler.scheduleJobs(); });
-    scheduler.printSchedule();
+
+    for (const auto &machine : scheduler.getMachines())
+    {
+        cout << "Machine " << machine.machineId << ": ";
+        for (int jobId : machine.assignedJobs)
+        {
+            auto it = find_if(jobs.begin(), jobs.end(),
+                              [jobId](const Job &job)
+                              { return job.jobId == jobId; });
+            if (it != jobs.end())
+            {
+                cout << it->jobId << "(" << it->processingTime << ") ";
+            }
+        }
+        cout << "- Total Load: " << machine.totalLoad << "\n";
+    }
+
+    int makespan = 0;
+    for (const auto &machine : scheduler.getMachines())
+    {
+        makespan = max(makespan, machine.totalLoad);
+    }
+    cout << "Makespan: " << makespan << "\n";
     cout << "Runtime: " << runtime << " microseconds\n\n";
 }
 

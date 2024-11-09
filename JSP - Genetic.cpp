@@ -57,15 +57,18 @@ private:
 
 public:
     JobSchedule(const vector<Job> &j, int m, int popSize, int gen, double mutRate)
-        : jobs(j), numMachines(m), populationSize(popSize), generations(gen), mutationRate(mutRate), gen(rd()) {}
+        : jobs(j), numMachines(m), populationSize(popSize), generations(gen),
+          mutationRate(mutRate), gen(rd()) {}
 
     Schedule evolve()
     {
         initializePopulation();
+
         for (int i = 0; i < generations; ++i)
         {
             evaluatePopulation();
             vector<Schedule> newPopulation;
+
             while (newPopulation.size() < populationSize)
             {
                 Schedule parent1 = selectParent();
@@ -76,15 +79,15 @@ public:
             }
             population = newPopulation;
         }
+
         evaluatePopulation();
-        return *min_element(population.begin(), population.end(),
-                            [](const Schedule &a, const Schedule &b)
-                            { return a.fitness < b.fitness; });
+        return getBestSchedule();
     }
 
 private:
     void initializePopulation()
     {
+        population.clear();
         for (int i = 0; i < populationSize; ++i)
         {
             Schedule schedule(numMachines);
@@ -107,10 +110,18 @@ private:
 
     Schedule selectParent()
     {
-        uniform_int_distribution<> dis(0, populationSize - 1);
-        const Schedule &a = population[dis(gen)];
-        const Schedule &b = population[dis(gen)];
-        return (a.fitness < b.fitness) ? a : b;
+        const int tournamentSize = 2;
+        Schedule best = population[uniform_int_distribution<>(0, populationSize - 1)(gen)];
+
+        for (int i = 1; i < tournamentSize; i++)
+        {
+            Schedule candidate = population[uniform_int_distribution<>(0, populationSize - 1)(gen)];
+            if (candidate.fitness < best.fitness)
+            {
+                best = candidate;
+            }
+        }
+        return best;
     }
 
     Schedule crossover(const Schedule &parent1, const Schedule &parent2)
@@ -155,36 +166,58 @@ private:
                 do
                 {
                     newMachine = uniform_int_distribution<>(0, numMachines - 1)(gen);
-                } while (newMachine == oldMachine);
+                } while (newMachine == oldMachine && numMachines > 1);
 
                 auto &oldMachineJobs = schedule.machineJobs[oldMachine];
-                oldMachineJobs.erase(remove(oldMachineJobs.begin(), oldMachineJobs.end(), i), oldMachineJobs.end());
+                oldMachineJobs.erase(
+                    remove(oldMachineJobs.begin(), oldMachineJobs.end(), i),
+                    oldMachineJobs.end());
                 schedule.machineJobs[newMachine].push_back(i);
             }
         }
     }
+
+    Schedule getBestSchedule() const
+    {
+        return *min_element(population.begin(), population.end(),
+                            [](const Schedule &a, const Schedule &b)
+                            {
+                                return a.fitness < b.fitness;
+                            });
+    }
 };
+
+template <typename Func>
+long long measureTime(Func func)
+{
+    auto start = chrono::high_resolution_clock::now();
+    func();
+    auto end = chrono::high_resolution_clock::now();
+    return chrono::duration_cast<chrono::microseconds>(end - start).count();
+}
 
 void runTestCase(const string &testName, const vector<Job> &jobs, int numMachines)
 {
     cout << testName << "\n";
     JobSchedule scheduler(jobs, numMachines, 100, 1000, 0.01);
-    auto start = chrono::high_resolution_clock::now();
-    Schedule bestSchedule = scheduler.evolve();
-    auto end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::microseconds>(end - start).count();
+    Schedule bestSchedule(numMachines);
+
+    long long runtime = measureTime([&]()
+                                    { bestSchedule = scheduler.evolve(); });
 
     for (size_t i = 0; i < bestSchedule.machineJobs.size(); ++i)
     {
         cout << "Machine " << i << ": ";
+        int machineLoad = 0;
         for (int jobIndex : bestSchedule.machineJobs[i])
         {
-            cout << jobs[jobIndex].jobId << " ";
+            cout << jobs[jobIndex].jobId << "(" << jobs[jobIndex].processingTime << ") ";
+            machineLoad += jobs[jobIndex].processingTime;
         }
-        cout << "\n";
+        cout << "- Total Load: " << machineLoad << "\n";
     }
-    cout << "Makespan: " << bestSchedule.fitness << "\n";
-    cout << "Runtime: " << duration << " microseconds\n\n";
+    cout << "Makespan: " << floor(bestSchedule.fitness) << "\n";
+    cout << "Runtime: " << runtime << " microseconds\n\n";
 }
 
 int main()

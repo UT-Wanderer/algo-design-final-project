@@ -5,7 +5,8 @@
 
 using namespace std;
 
-class Job {
+class Job
+{
 public:
     int jobId;
     int processingTime;
@@ -13,7 +14,8 @@ public:
     Job(int id, int processingTime) : jobId(id), processingTime(processingTime) {}
 };
 
-class Machine {
+class Machine
+{
 public:
     int machineId;
     int totalLoad;
@@ -21,27 +23,28 @@ public:
 
     Machine(int id) : machineId(id), totalLoad(0) {}
 
-    void addJob(const Job& job) 
+    void addJob(const Job &job)
     {
         totalLoad += job.processingTime;
         assignedJobs.push_back(job.jobId);
     }
 
-    bool operator<(const Machine& other) const 
+    bool operator<(const Machine &other) const
     {
         return totalLoad < other.totalLoad;
     }
 };
 
-class JobSchedule {
+class JobSchedule
+{
 private:
     vector<Machine> machines;
     vector<Job> jobs;
 
 public:
-    JobSchedule(int numMachines, const vector<Job>& jobs) : jobs(jobs) 
+    JobSchedule(int numMachines, const vector<Job> &jobs) : jobs(jobs)
     {
-        for (int i = 0; i < numMachines; ++i) 
+        for (int i = 0; i < numMachines; ++i)
         {
             machines.emplace_back(i);
         }
@@ -49,7 +52,7 @@ public:
 
     void scheduleJobs()
     {
-        for (const auto& job : jobs) 
+        for (const auto &job : jobs)
         {
             auto leastLoadedMachine = min_element(machines.begin(), machines.end());
             leastLoadedMachine->addJob(job);
@@ -58,7 +61,7 @@ public:
 
     void printSchedule() const
     {
-        for (const auto& machine : machines) 
+        for (const auto &machine : machines)
         {
             cout << "Machine " << machine.machineId << ": " << machine.totalLoad << " units (Jobs:";
             for (int jobId : machine.assignedJobs)
@@ -68,31 +71,60 @@ public:
             cout << ")\n";
         }
     }
+
+    const vector<Machine> &getMachines() const
+    {
+        return machines;
+    }
 };
 
-template<typename Func>
-long long measureTime(Func func) {
+template <typename Func>
+long long measureTime(Func func)
+{
     auto start = chrono::high_resolution_clock::now();
     func();
     auto end = chrono::high_resolution_clock::now();
-    return chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    return chrono::duration_cast<chrono::microseconds>(end - start).count();
 }
 
-void runTestCase(const string& testName, const vector<Job>& jobs, int numMachines) {
+void runTestCase(const string &testName, const vector<Job> &jobs, int numMachines)
+{
     cout << testName << "\n";
     JobSchedule scheduler(numMachines, jobs);
-    long long runtime = measureTime([&]() {
-        scheduler.scheduleJobs();
-        });
-    scheduler.printSchedule();
+    long long runtime = measureTime([&]()
+                                    { scheduler.scheduleJobs(); });
+
+    for (const auto &machine : scheduler.getMachines())
+    {
+        cout << "Machine " << machine.machineId << ": ";
+        for (int jobId : machine.assignedJobs)
+        {
+            auto it = find_if(jobs.begin(), jobs.end(),
+                              [jobId](const Job &job)
+                              { return job.jobId == jobId; });
+            if (it != jobs.end())
+            {
+                cout << it->jobId << "(" << it->processingTime << ") ";
+            }
+        }
+        cout << "- Total Load: " << machine.totalLoad << "\n";
+    }
+
+    int makespan = 0;
+    for (const auto &machine : scheduler.getMachines())
+    {
+        makespan = max(makespan, machine.totalLoad);
+    }
+    cout << "Makespan: " << makespan << "\n";
     cout << "Runtime: " << runtime << " microseconds\n\n";
 }
 
-int main() {
-    runTestCase("Test Case 1: Basic Test", { {1, 2}, {2, 3}, {3, 5}, {4, 7}, {5, 1} }, 2);
-    runTestCase("Test Case 2: All Jobs of Equal Length", { {1, 5}, {2, 5}, {3, 5}, {4, 5} }, 2);
-    runTestCase("Test Case 3: More Machines than Jobs", { {1, 6}, {2, 2}, {3, 8} }, 4);
-    runTestCase("Test Case 4: Single Job", { {1, 10} }, 3);
-    runTestCase("Test Case 5: Complex Test", { {1, 2}, {2, 1}, {3, 2}, {4, 7}, {5, 3}, {6, 6} }, 3);
+int main()
+{
+    runTestCase("Test Case 1: Basic Test", {{1, 2}, {2, 3}, {3, 5}, {4, 7}, {5, 1}}, 2);
+    runTestCase("Test Case 2: All Jobs of Equal Length", {{1, 5}, {2, 5}, {3, 5}, {4, 5}}, 2);
+    runTestCase("Test Case 3: More Machines than Jobs", {{1, 6}, {2, 2}, {3, 8}}, 4);
+    runTestCase("Test Case 4: Single Job", {{1, 10}}, 3);
+    runTestCase("Test Case 5: Complex Test", {{1, 2}, {2, 1}, {3, 2}, {4, 7}, {5, 3}, {6, 6}}, 3);
     return 0;
 }
